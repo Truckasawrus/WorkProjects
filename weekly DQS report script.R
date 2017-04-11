@@ -1,18 +1,18 @@
-  library(plyr)
-  library(dplyr)
-  library(ggplot2)
-  library(quantmod)
-  library(reshape2)
-  library(scales)
-  library(DataCombine)
-  library(timeDate)
-  library(tidyr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(quantmod)
+library(reshape2)
+library(scales)
+library(DataCombine)
+library(timeDate)
+library(tidyr)
 
 
 
 ##READ IN PARSED OUT WEEKLY STATS SPREADSHEETS
 
-AllAudits<-read.csv("Copy of 3-17 to 3-23 CDS Review.csv")
+AllAudits<-read.csv("DQS032017.csv")
 
 
 ###CHANGE DATE COLUMNS TO ACTUAL DATE TYPE AND FORMAT
@@ -20,13 +20,22 @@ AllAudits<-read.csv("Copy of 3-17 to 3-23 CDS Review.csv")
 
 AllAudits$Date<-as.Date(AllAudits$Date,format = "%m/%d/%Y")
 
+###Change Blank Assignments to 'UNASSIGNED'
+
+AllAudits$Service.Manager<-sub("^$","Unassigned",AllAudits$Service.Manager)
+AllAudits$Service.Senior.Manager<-sub("^$","Unassigned",AllAudits$Service.Senior.Manager)
+AllAudits$Service.Operations.Associate<-sub("^$","Unassigned",AllAudits$Service.Operations.Associate)
+AllAudits$Reconciliation.Senior.Manager<-sub("^$","Unassigned",AllAudits$Reconciliation.Senior.Manager)
+AllAudits$Reconciliation.Manager.Lead<-sub("^$","Unassigned",AllAudits$Reconciliation.Manager.Lead)
+AllAudits$Reconciliation.Analyst<-sub("^$","Unassigned",AllAudits$Reconciliation.Analyst)
+
+
 
 
 ###COLLAPSE DATE COLUMNS FROM LONG FORM AND CHANGE N/A VALUES TO ZEROS
 
 AllAuditsTotals<-ddply(AllAudits,.(Date,Service.Operations.Associate,Service.Manager)
                        ,summarize,Total.Actionable = (sum(Total.Actionable.Audit.Results)),
-                       Total.Actionable.Missing.Price =(sum(Actionable.Audits.Missing.Prices)),
                        Total.Missing =(sum(Account.Status..Accounts.Missing.Reconciliation)),
                        Total.Duplicate =(sum(Account.Status..Duplicate.Account.Numbers)),
                        Total.Closed.With.Holdings =(sum(Holdings.Recon..Closed.Accounts.with.Holdings)),
@@ -48,7 +57,7 @@ AllAuditsTotals<-ddply(AllAudits,.(Date,Service.Operations.Associate,Service.Man
                        Total.Unproc.Xfers =(sum(Transaction..Unprocessed.Account.Transfers))
 )
 
-
+AllAuditsTotals[is.na(AllAuditsTotals)]<-0
 
 ###SUMMARIZE DATA TO TOTALS
 
@@ -63,19 +72,18 @@ AllAuditsTotals<-ddply(AllAudits,.(Date,Service.Operations.Associate,Service.Man
 
 
 
-
 AllAuditsTotals<-AllAuditsTotals%>%
-  gather(AuditType,Results,4:24)
+  gather(AuditType,Results,4:23)
 
 
+##Daily Change by Audit, by Ops Assoc.
+AllAuditsTotals<-AllAuditsTotals%>%
+  group_by(Service.Operations.Associate, AuditType)%>%
+  mutate(TotalDiff= ave(Results,FUN=function(x) c(0, diff(x))))
 
 
-AllAuditsChange<-AllAuditsTotals%>%
-  group_by(Date,Audit)
       
-
-
-
+##Subset only Actionable, Unreconciled, Missing
 AllAuditsTotalsAction<-subset(AllAuditsTotals,AuditType %in% 
                                 c("Total.Actionable",
                                   "Total.Unreconciled",
@@ -83,11 +91,7 @@ AllAuditsTotalsAction<-subset(AllAuditsTotals,AuditType %in%
 
 
 
-
-AllAuditsTotalsAction<-AllAuditsTotalsAction%>%
-gather(AuditType,Results,4:6)
-
-
+##Summary Totals Table to Label team-visualizations
 sum_count<-AllAuditsTotalsAction%>%
   group_by(Date,Service.Operations.Associate,Service.Manager)%>%
   summarise(Total.Results = sum(Results))
