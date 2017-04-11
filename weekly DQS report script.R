@@ -76,7 +76,7 @@ AllAuditsTotals<-AllAuditsTotals%>%
   gather(AuditType,Results,4:23)
 
 
-##Daily Change by Audit, by Ops Assoc.
+##Daily Change by Audit, by Ops Associate
 AllAuditsTotals<-AllAuditsTotals%>%
   group_by(Service.Operations.Associate, AuditType)%>%
   mutate(TotalDiff= ave(Results,FUN=function(x) c(0, diff(x))))
